@@ -19,7 +19,7 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 const app = express();
-const port = 3000;
+const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
@@ -473,7 +473,7 @@ app.get('/api/organizers/:organizerId/best-ticket-type', async (req, res) => {
 
 
 // create notifications
-app.post("/notifications", async (req, res) => {
+app.post("/api/notifications", async (req, res) => {
   try {
     const notificationData = req.body;
     await db
@@ -487,7 +487,7 @@ app.post("/notifications", async (req, res) => {
 });
 
 // Create batch notifications
-app.post("/notifications/batch", async (req, res) => {
+app.post("/api/notifications/batch", async (req, res) => {
   try {
     const notifications = req.body;
     const batch = db.batch();
@@ -506,7 +506,7 @@ app.post("/notifications/batch", async (req, res) => {
 });
 
 // send an email to a user for verification
-app.post("/verify", async (req, res) => {
+app.post("/api/verify", async (req, res) => {
   try {
     const message = req.body;
     const transporter = nodemailer.createTransport({
