@@ -98,15 +98,42 @@ app.post('/events/batch', async (req, res) => {
   }
 });
 
+
+
+// Get all events, optionally marking favorites for a logged-in user
 app.get('/events', async (req, res) => {
+  const { userId } = req.query;
+
   try {
-    const snapshot = await db.collection('events').get();
-    const events = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const eventsSnapshot = await db.collection('events').get();
+    let events = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    if (userId) {
+      const favoriteRef = db.collection('favorites').doc(userId);
+      const favoriteDoc = await favoriteRef.get();
+
+      if (favoriteDoc.exists) {
+        const favoriteEvents = favoriteDoc.data().events || [];
+        events = events.map(event => ({
+          ...event,
+          isLiked: favoriteEvents.includes(event.id),
+        }));
+      } else {
+        // No favorites found, so all events are not liked
+        events = events.map(event => ({
+          ...event,
+          isLiked: false,
+        }));
+      }
+    }
+
     res.status(200).json(events);
   } catch (error) {
+    console.error('Error fetching events:', error);
     res.status(500).json({ error: 'Error fetching events' });
   }
 });
+
 
 app.get('/events/:id', async (req, res) => {
   try {
