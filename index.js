@@ -1,9 +1,13 @@
 const express = require('express');
 const admin = require('firebase-admin');
+const Mux = require('@mux/mux-node');
 const nodemailer = require("nodemailer");
 const { body, validationResult } = require('express-validator');
 const cors = require('cors');
 const config = require('./config.js');
+const dotenv = require('dotenv');
+
+dotenv.config();
 
 
 if (!admin.apps.length) {
@@ -20,6 +24,12 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 const app = express();
 const port = process.env.PORT || 3000;
+// const { Video } = new Mux(config.muxApiKey, config.muxApiSecret);
+// const {Video} = new Mux(
+//     process.env.MUX_TOKEN_ID,
+//     process.env.MUX_TOKEN_SECRET,
+// );
+
 
 // Middleware
 app.use(express.json());
@@ -165,6 +175,141 @@ app.delete('/events', async (req, res) => {
     res.status(200).json({ message: 'All events deleted' });
   } catch (error) {
     res.status(500).json({ error: 'Error deleting all events' });
+  }
+});
+
+
+
+// Get favorited events for a user
+app.get('/users/:userId/favorites', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    // Get the user's favorite events from the favorites collection
+    const favoriteRef = db.collection('favorites').doc(userId);
+    const favoriteDoc = await favoriteRef.get();
+    
+    if (!favoriteDoc.exists) {
+      return res.status(404).json({ error: 'No favorites found for this user' });
+    }
+
+    const favoriteEvents = favoriteDoc.data().events;
+
+    if (!favoriteEvents || favoriteEvents.length === 0) {
+      return res.status(200).json([]);
+    }
+
+    // Fetch the details of the favorited events from the events collection
+    const eventsSnapshot = await db.collection('events').where(admin.firestore.FieldPath.documentId(), 'in', favoriteEvents).get();
+
+    const events = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    res.status(200).json(events);
+  } catch (error) {
+    console.error('Error fetching favorited events:', error);
+    res.status(500).json({ error: 'Error fetching favorited events' });
+  }
+});
+
+
+// Toggle favorite/unfavorite event for a user
+app.post('/events/:id/toggleFavorite', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) {
+    return res.status(400).json({ error: 'User ID is required' });
+  }
+
+  try {
+    const favoriteRef = db.collection('favorites').doc(userId);
+    const doc = await favoriteRef.get();
+
+    if (doc.exists) {
+      const favorites = doc.data().events || [];
+      if (favorites.includes(req.params.id)) {
+        await favoriteRef.update({
+          events: admin.firestore.FieldValue.arrayRemove(req.params.id)
+        });
+        res.status(200).json({ message: 'Event unfavorited' });
+      } else {
+        await favoriteRef.update({
+          events: admin.firestore.FieldValue.arrayUnion(req.params.id)
+        });
+        res.status(200).json({ message: 'Event favorited' });
+      }
+    } else {
+      await favoriteRef.set({
+        events: [req.params.id]
+      });
+      res.status(200).json({ message: 'Event favorited' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Error toggling favorite' });
+  }
+});
+
+
+
+
+// SUGGESTIONS ROUTE
+// Get suggestions for a user
+app.get('/users/:userId/suggestions', async (req, res) => {
+  const { userId } = req.params;
+
+  try {
+    // Get the user's favorite events from the favorites collection
+    const favoriteRef = db.collection('favorites').doc(userId);
+    const favoriteDoc = await favoriteRef.get();
+
+    if (!favoriteDoc.exists) {
+      return res.status(404).json({ error: 'No favorites found for this user' });
+    }
+
+    const favoriteEvents = favoriteDoc.data().events;
+
+    // If there are no favorite events, return an empty list
+    if (!favoriteEvents || favoriteEvents.length === 0) {
+      return res.status(200).json([]);
+    }
+
+    // Fetch the categories of the favorite events
+    const favoriteCategories = new Set();
+    const favoriteLocations = new Set();
+
+    const favoriteEventsSnapshot = await db.collection('events').where(admin.firestore.FieldPath.documentId(), 'in', favoriteEvents).get();
+    favoriteEventsSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.category) {
+        favoriteCategories.add(data.category);
+      }
+      if (data.location) {
+        favoriteLocations.add(data.location);
+      }
+    });
+
+    // If there are no categories or locations, return an empty list
+    if (favoriteCategories.size === 0 && favoriteLocations.size === 0) {
+      return res.status(200).json([]);
+    }
+
+    // Build the query
+    let eventQuery = db.collection('events');
+    
+    if (favoriteCategories.size > 0) {
+      eventQuery = eventQuery.where('category', 'in', Array.from(favoriteCategories));
+    }
+    
+    if (favoriteLocations.size > 0) {
+      eventQuery = eventQuery.where('location', 'in', Array.from(favoriteLocations));
+    }
+
+    // Fetch the events based on categories and locations
+    const snapshot = await eventQuery.limit(10).get();
+    const suggestedEvents = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+
+    res.status(200).json(suggestedEvents);
+  } catch (error) {
+    console.error('Error fetching suggestions:', error);
+    res.status(500).json({ error: 'Error fetching suggestions' });
   }
 });
 
@@ -535,8 +680,62 @@ app.post("/api/verify", async (req, res) => {
 });
 
 
+const { video } = new Mux(
+    process.env.MUX_TOKEN_ID,
+    process.env.MUX_TOKEN_SECRET,
+);
+
+
+// Endpoint to start a livestream
+app.post('/livestreams/start', async (req, res) => {
+  try {
+    const {  playback_policy = 'public' } = req.body;
+    const newStream = await video.liveStreams.create({
+      playback_policy,
+      new_asset_settings: { playback_policy },
+      reconnect_window: 10,
+    });
+    res.status(201).json(newStream);
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint to get a list of livestreams
+app.get('/livestreams', async (req, res) => {
+  try {
+    const livestreams = await video.liveStreams.list();
+    res.status(200).json(livestreams);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint to get livestream details
+app.get('/livestreams/:id', async (req, res) => {
+  try {
+    const livestreamId = req.params.id;
+    const livestream = await video.liveStreams.retrieve(livestreamId);
+    res.status(200).json(livestream);
+  } catch (error) {
+
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Endpoint to end a livestream
+app.post('/livestreams/:id/end', async (req, res) => {
+  try {
+    const livestreamId = req.params.id;
+    await video.liveStreams.disable(livestreamId);
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // Start server
-app.listen(port, () => {
+app.listen(port, "0.0.0.0" ,() => {
   console.log(`Server running at http://localhost:${port}`);
 });

@@ -13,5 +13,7 @@ module.exports = {
   tokenUri: process.env.TOKEN_URI,
   authProviderX509CertUrl: process.env.AUTH_PROVIDER_X509_CERT_URL,
   clientX509CertUrl: process.env.CLIENT_X509_CERT_URL,
-  universeDomain: process.env.UNIVERSE_DOMAIN
+  universeDomain: process.env.UNIVERSE_DOMAIN,
+  muxApiKey: process.env.MUX_API_KEY,
+  muxApiSecret: process.env.MUX_API_SECRET
 };
