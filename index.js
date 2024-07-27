@@ -277,8 +277,7 @@ app.post('/events/:id/toggleFavorite', async (req, res) => {
 
 
 
-// SUGGESTIONS ROUTE
-// Get suggestions for a user
+// Get suggestions for a user, optionally marking favorites for a logged-in user
 app.get('/users/:userId/suggestions', async (req, res) => {
   const { userId } = req.params;
 
@@ -298,11 +297,14 @@ app.get('/users/:userId/suggestions', async (req, res) => {
       return res.status(200).json([]);
     }
 
-    // Fetch the categories of the favorite events
+    // Fetch the categories and locations of the favorite events
     const favoriteCategories = new Set();
     const favoriteLocations = new Set();
 
-    const favoriteEventsSnapshot = await db.collection('events').where(admin.firestore.FieldPath.documentId(), 'in', favoriteEvents).get();
+    const favoriteEventsSnapshot = await db.collection('events')
+      .where(admin.firestore.FieldPath.documentId(), 'in', favoriteEvents)
+      .get();
+
     favoriteEventsSnapshot.docs.forEach(doc => {
       const data = doc.data();
       if (data.category) {
@@ -331,7 +333,15 @@ app.get('/users/:userId/suggestions', async (req, res) => {
 
     // Fetch the events based on categories and locations
     const snapshot = await eventQuery.limit(10).get();
-    const suggestedEvents = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    let suggestedEvents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Add isLiked field if the user is logged in
+    if (userId) {
+      suggestedEvents = suggestedEvents.map(event => ({
+        ...event,
+        isLiked: favoriteEvents.includes(event.id),
+      }));
+    }
 
     res.status(200).json(suggestedEvents);
   } catch (error) {
