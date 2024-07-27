@@ -207,7 +207,7 @@ app.delete('/events', async (req, res) => {
 
 
 
-// Get favorited events for a user
+// Get favorited events for a user, marking all as liked
 app.get('/users/:userId/favorites', async (req, res) => {
   const { userId } = req.params;
 
@@ -227,9 +227,16 @@ app.get('/users/:userId/favorites', async (req, res) => {
     }
 
     // Fetch the details of the favorited events from the events collection
-    const eventsSnapshot = await db.collection('events').where(admin.firestore.FieldPath.documentId(), 'in', favoriteEvents).get();
+    const eventsSnapshot = await db.collection('events')
+      .where(admin.firestore.FieldPath.documentId(), 'in', favoriteEvents)
+      .get();
 
-    const events = eventsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Add isLiked field to each event
+    const events = eventsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      isLiked: true,
+    }));
 
     res.status(200).json(events);
   } catch (error) {
@@ -237,6 +244,7 @@ app.get('/users/:userId/favorites', async (req, res) => {
     res.status(500).json({ error: 'Error fetching favorited events' });
   }
 });
+
 
 
 // Toggle favorite/unfavorite event for a user
