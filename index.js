@@ -761,6 +761,10 @@ app.get('/attendance/event/:eventId', async (req, res) => {
 // Create a new ticket payment record
 app.post('/payments', async (req, res) => {
   const { paymentId, userId, eventId, amount, status, paymentType } = req.body;
+  if(!paymentId || !userId || !eventId || !amount || !status || !paymentType) {
+    return res.status(400).send({ message: 'Missing required fields' });
+  }
+  
   try {
     await db.collection('payments').doc(paymentId).set({
       paymentId,
