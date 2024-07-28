@@ -6,6 +6,7 @@ const { body, validationResult } = require('express-validator');
 const cors = require('cors');
 const config = require('./config.js');
 const dotenv = require('dotenv');
+const { FieldValue } = require('firebase-admin/firestore');
 
 dotenv.config();
 
@@ -755,17 +756,20 @@ app.get('/attendance/event/:eventId', async (req, res) => {
 });
 
 
+
 // PAYMENT API ENDPOINTS
 // Create a new ticket payment record
 app.post('/payments', async (req, res) => {
-  const { paymentId, userId, eventId, amount, status, timestamp } = req.body;
+  const { paymentId, userId, eventId, amount, status, paymentType } = req.body;
   try {
     await db.collection('payments').doc(paymentId).set({
+      paymentId,
       userId,
       eventId,
       amount,
       status,
-      timestamp: new Date(timestamp),
+      paymentType,
+      timestamp: FieldValue.serverTimestamp(),
     });
     res.status(201).send({ message: 'Payment record created successfully' });
   } catch (error) {
