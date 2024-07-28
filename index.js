@@ -673,7 +673,7 @@ app.post('/attendance', async (req, res) => {
       attendanceStatus,
       paymentStatus,
     });
-    res.status(201).send({ message: 'Attendance record created successfully' });
+    res.status(201).send({ message: 'Attendance record created successfully', attendanceId });
   } catch (error) {
     res.status(500).send({ error: 'Error creating attendance record' });
   }
