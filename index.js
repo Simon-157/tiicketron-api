@@ -607,6 +607,7 @@ app.get('/api/organizers/:organizerId/sold-tickets', async (req, res) => {
   }
 });
 
+
 // ** 3. Get Overall Events for an Organizer ** //
 app.get('/api/organizers/:organizerId/events', async (req, res) => {
   const { organizerId } = req.params;
@@ -659,6 +660,197 @@ app.get('/api/organizers/:organizerId/best-ticket-type', async (req, res) => {
   }
 });
 
+
+// ATTENDANCE API ENDPOINTS
+// Create a new attendance record
+app.post('/attendance', async (req, res) => {
+  const { attendanceId, eventId, userId, timestamp, attendanceStatus, paymentStatus } = req.body;
+  try {
+    await db.collection('attendances').doc(attendanceId).set({
+      eventId,
+      userId,
+      timestamp: new Date(timestamp),
+      attendanceStatus,
+      paymentStatus,
+    });
+    res.status(201).send({ message: 'Attendance record created successfully' });
+  } catch (error) {
+    res.status(500).send({ error: 'Error creating attendance record' });
+  }
+});
+
+// Get a specific attendance record by ID
+app.get('/attendance/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const attendanceDoc = await db.collection('attendances').doc(id).get();
+    if (!attendanceDoc.exists) {
+      return res.status(404).send({ message: 'Attendance record not found' });
+    }
+    res.status(200).send(attendanceDoc.data());
+  } catch (error) {
+    res.status(500).send({ error: 'Error fetching attendance record' });
+  }
+});
+
+// Update a specific attendance record by ID
+app.put('/attendance/:id', async (req, res) => {
+  const { id } = req.params;
+  const { attendanceStatus, paymentStatus } = req.body;
+  try {
+    await db.collection('attendances').doc(id).update({
+      attendanceStatus,
+      paymentStatus,
+    });
+    res.status(200).send({ message: 'Attendance record updated successfully' });
+  } catch (error) {
+    res.status(500).send({ error: 'Error updating attendance record' });
+  }
+});
+
+// Delete a specific attendance record by ID
+app.delete('/attendance/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.collection('attendances').doc(id).delete();
+    res.status(200).send({ message: 'Attendance record deleted successfully' });
+  } catch (error) {
+    res.status(500).send({ error: 'Error deleting attendance record' });
+  }
+});
+
+
+// Get attendance list for a given event
+app.get('/attendance/event/:eventId', async (req, res) => {
+  const { eventId } = req.params;
+  try {
+    const attendanceSnapshot = await db.collection('attendances').where('eventId', '==', eventId).get();
+    if (attendanceSnapshot.empty) {
+      return res.status(404).send({ message: 'No attendance records found for this event' });
+    }
+
+    const attendanceList = [];
+    for (const doc of attendanceSnapshot.docs) {
+      const attendanceData = doc.data();
+      const userSnapshot = await db.collection('users').doc(attendanceData.userId).get();
+      if (!userSnapshot.exists) {
+        continue;
+      }
+      const userData = userSnapshot.data();
+      attendanceList.push({
+        userId: userData.userId,
+        name: userData.name,
+        email: userData.email,
+        avatarUrl: userData.avatarUrl,
+        attendanceStatus: attendanceData.attendanceStatus,
+        paymentStatus: attendanceData.paymentStatus,
+      });
+    }
+
+    res.status(200).send(attendanceList);
+  } catch (error) {
+    res.status(500).send({ error: 'Error fetching attendance list' });
+  }
+});
+
+
+// PAYMENT API ENDPOINTS
+// Create a new ticket payment record
+app.post('/payments', async (req, res) => {
+  const { paymentId, userId, eventId, amount, status, timestamp } = req.body;
+  try {
+    await db.collection('payments').doc(paymentId).set({
+      userId,
+      eventId,
+      amount,
+      status,
+      timestamp: new Date(timestamp),
+    });
+    res.status(201).send({ message: 'Payment record created successfully' });
+  } catch (error) {
+    res.status(500).send({ error: 'Error creating payment record' });
+  }
+});
+
+// Get a specific payment record by ID
+app.get('/payments/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const paymentDoc = await db.collection('payments').doc(id).get();
+    if (!paymentDoc.exists) {
+      return res.status(404).send({ message: 'Payment record not found' });
+    }
+    res.status(200).send(paymentDoc.data());
+  } catch (error) {
+    res.status(500).send({ error: 'Error fetching payment record' });
+  }
+});
+
+// Update a specific payment record by ID
+app.put('/payments/:id', async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  try {
+    await db.collection('payments').doc(id).update({
+      status,
+    });
+    res.status(200).send({ message: 'Payment record updated successfully' });
+  } catch (error) {
+    res.status(500).send({ error: 'Error updating payment record' });
+  }
+});
+
+// Delete a specific payment record by ID
+app.delete('/payments/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await db.collection('payments').doc(id).delete();
+    res.status(200).send({ message: 'Payment record deleted successfully' });
+  } catch (error) {
+    res.status(500).send({ error: 'Error deleting payment record' });
+  }
+});
+
+// Get all payments for a specific user
+app.get('/payments/user/:userId', async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const paymentSnapshot = await db.collection('payments').where('userId', '==', userId).get();
+    if (paymentSnapshot.empty) {
+      return res.status(404).send({ message: 'No payment records found for this user' });
+    }
+
+    const paymentList = [];
+    paymentSnapshot.forEach(doc => {
+      paymentList.push(doc.data());
+    });
+
+    res.status(200).send(paymentList);
+  } catch (error) {
+    res.status(500).send({ error: 'Error fetching payment records' });
+  }
+});
+
+
+// Get total revenue for a specific event
+app.get('/revenue/event/:eventId', async (req, res) => {
+  const { eventId } = req.params;
+  try {
+    const paymentSnapshot = await db.collection('payments').where('eventId', '==', eventId).where('status', '==', 'paid').get();
+    if (paymentSnapshot.empty) {
+      return res.status(404).send({ message: 'No payment records found for this event' });
+    }
+
+    let totalRevenue = 0;
+    paymentSnapshot.forEach(doc => {
+      totalRevenue += doc.data().amount;
+    });
+
+    res.status(200).send({ totalRevenue });
+  } catch (error) {
+    res.status(500).send({ error: 'Error fetching total revenue' });
+  }
+});
 
 
 
