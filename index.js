@@ -667,6 +667,7 @@ app.post('/attendance', async (req, res) => {
   const { attendanceId, eventId, userId, timestamp, attendanceStatus, paymentStatus } = req.body;
   try {
     await db.collection('attendances').doc(attendanceId).set({
+      attendanceId,
       eventId,
       userId,
       timestamp: new Date(timestamp),
