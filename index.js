@@ -773,7 +773,7 @@ app.post('/payments', async (req, res) => {
     });
     res.status(201).send({ message: 'Payment record created successfully' });
   } catch (error) {
-    res.status(500).send({ error: 'Error creating payment record' });
+    res.status(500).send({ error: 'Error creating payment record, : ' + error.message });
   }
 });
 
