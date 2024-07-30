@@ -406,7 +406,12 @@ app.get('/api/events/:eventId/statistics', async (req, res) => {
     const ticketsSnapshot = await db.collection('tickets').where('eventId', '==', eventId).get();
 
     if (ticketsSnapshot.empty) {
-      return handleError(res, 404, 'No tickets found for this event.');
+      handleSuccess(res, {
+      totalTickets: 0,
+      totalRevenue:0,
+      soldTickets:0,
+      canceledTickets:0,
+    }); ;
     }
 
     let totalRevenue = 0;
