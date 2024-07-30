@@ -764,7 +764,7 @@ app.get('/api/attendance/event/:eventId', async (req, res) => {
 
     res.status(200).send(attendanceList);
   } catch (error) {
-    res.status(500).send({ error: 'Error fetching attendance list' });
+    res.status(500).send({ error: 'Error fetching attendance list: ' + error.message });
   }
 });
 
