@@ -674,6 +674,26 @@ app.post('/api/attendance', async (req, res) => {
   }
 });
 
+//create batch attendance with their attendndance ids
+app.post("/api/attendances/batch", async (req, res) => {
+  try {
+    const attendances = req.body;
+    const batch = db.batch();
+    attendances.forEach((attendance) => {
+      const attendanceRef = db.collection('attendances').doc();
+      batch.set(attendanceRef, {
+        ...attendance,
+        attendanceId: attendanceRef.id
+      });
+      
+    });
+    await batch.commit();
+    res.status(201).send({ message: 'Attendances created successfully' });
+  } catch (error) {
+    res.status(500).send({ error: 'Error creating attendances: ' + error.message });
+  }
+});
+
 // Get a specific attendance record by ID
 app.get('/api/attendance/:id', async (req, res) => {
   const { id } = req.params;
