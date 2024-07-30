@@ -409,8 +409,17 @@ app.get('/api/events/:eventId/statistics', async (req, res) => {
       return handleError(res, 404, 'No tickets found for this event.');
     }
 
+    let totalRevenue = 0;
+    const paymentSnapshot = await db.collection('payments').where('eventId', '==', eventId).where('status', '==', 'paid').get();
+    if (paymentSnapshot.empty) {
+      totalRevenue = 0; 
+    }
+
+    paymentSnapshot.forEach(doc => {
+      totalRevenue += doc.data().amount;
+    });
+
     const totalTickets = ticketsSnapshot.size;
-    const totalRevenue = ticketsSnapshot.docs.reduce((sum, doc) => sum + (doc.data().totalPrice || 0), 0);
     const soldTickets = ticketsSnapshot.docs.filter(doc => doc.data().status === 'confirmed').length;
     const canceledTickets = ticketsSnapshot.docs.filter(doc => doc.data().status === 'canceled').length;
 
