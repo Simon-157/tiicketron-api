@@ -57,7 +57,40 @@ const validateEvent = [
   body('totalCapacityNeeded').isInt(),
 ];
 
-// Routes
+
+// create users
+app.post("/api/users", async (req, res) => {
+  try {
+    const user = req.body;
+    await db.collection("users").doc(user.userId).set(user);
+    res.status(201).send("User created successfully");
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+
+// create batch users
+app.post("/api/users/batch", async (req, res) => {
+  try {
+    const users = req.body;
+    const batch = db.batch();
+    users.forEach((user) => {
+      const userRef = db
+        .collection("users")
+        .doc(user.userId);
+      batch.set(userRef, user);
+    });
+
+    await batch.commit();
+    res.status(201).send("Batch users created successfully");
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
+
+// event Routes
 app.post('/api/events', validateEvent, async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
