@@ -577,8 +577,7 @@ app.get('/api/organizers/:organizerId/kpis', async (req, res) => {
 
     const ticketsSnapshot = await db.collection('tickets')
       .where('eventId', 'in', eventIds)
-      .where('status', '==', 'confirmed')
-      .get();
+       .get();
 
     const totalRevenue = ticketsSnapshot.docs.reduce((sum, doc) => sum + (doc.data().totalPrice || 0), 0);
     const totalSoldTickets = ticketsSnapshot.size;
