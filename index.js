@@ -736,6 +736,26 @@ app.post('/api/payments', async (req, res) => {
   }
 });
 
+
+// create batch payments
+app.post("/api/payments/batch", async (req, res) => {
+  try {
+    const payments = req.body;
+    const batch = db.batch();
+    payments.forEach((payment) => {
+      const paymentRef = db
+        .collection("payments")
+        .doc(payment.payment_id);
+      batch.set(paymentRef, payment);
+    });
+
+    await batch.commit();
+    res.status(201).send("Batch payments created successfully");
+  } catch (error) {
+    handleError(res, error);
+  }
+});
+
 // Get a specific payment record by ID
 app.get('/api/payments/:id', async (req, res) => {
   const { id } = req.params;
