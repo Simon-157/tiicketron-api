@@ -58,7 +58,7 @@ const validateEvent = [
 ];
 
 // Routes
-app.post('/events', validateEvent, async (req, res) => {
+app.post('/api/events', validateEvent, async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -79,7 +79,7 @@ app.post('/events', validateEvent, async (req, res) => {
   }
 });
 
-app.post('/events/batch', async (req, res) => {
+app.post('/api/events/batch', async (req, res) => {
   try {
     const batch = db.batch();
     req.body.events.forEach((event) => {
@@ -102,7 +102,7 @@ app.post('/events/batch', async (req, res) => {
 
 
 // Get all events, optionally marking favorites for a logged-in user
-app.get('/events', async (req, res) => {
+app.get('/api/events', async (req, res) => {
   const { userId } = req.query;
 
   try {
@@ -136,7 +136,7 @@ app.get('/events', async (req, res) => {
 });
 
 
-app.get('/events/:id', async (req, res) => {
+app.get('/api/events/:id', async (req, res) => {
   try {
     const eventRef = db.collection('events').doc(req.params.id);
     const doc = await eventRef.get();
@@ -149,7 +149,7 @@ app.get('/events/:id', async (req, res) => {
   }
 });
 
-app.get('/events/organizer/:organizerId', async (req, res) => {
+app.get('/api/events/organizer/:organizerId', async (req, res) => {
   try {
     const snapshot = await db.collection('events').where('organizer.organizerId', '==', req.params.organizerId).get();
     const events = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
@@ -159,7 +159,7 @@ app.get('/events/organizer/:organizerId', async (req, res) => {
   }
 });
 
-app.put('/events/:id', validateEvent, async (req, res) => {
+app.put('/api/events/:id', validateEvent, async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     return res.status(400).json({ errors: errors.array() });
@@ -174,7 +174,7 @@ app.put('/events/:id', validateEvent, async (req, res) => {
   }
 });
 
-app.delete('/events/:id', async (req, res) => {
+app.delete('/api/events/:id', async (req, res) => {
   try {
     const eventRef = db.collection('events').doc(req.params.id);
     await eventRef.delete();
@@ -184,7 +184,7 @@ app.delete('/events/:id', async (req, res) => {
   }
 });
 
-app.delete('/events', async (req, res) => {
+app.delete('/api/events', async (req, res) => {
   try {
     // Retrieve all events
     const snapshot = await db.collection('events').get();
@@ -209,7 +209,7 @@ app.delete('/events', async (req, res) => {
 
 
 // Get favorited events for a user, marking all as liked
-app.get('/users/:userId/favorites', async (req, res) => {
+app.get('/api/users/:userId/favorites', async (req, res) => {
   const { userId } = req.params;
 
   try {
@@ -249,7 +249,7 @@ app.get('/users/:userId/favorites', async (req, res) => {
 
 
 // Toggle favorite/unfavorite event for a user
-app.post('/events/:id/toggleFavorite', async (req, res) => {
+app.post('/api/events/:id/toggleFavorite', async (req, res) => {
   const { userId } = req.body;
   if (!userId) {
     return res.status(400).json({ error: 'User ID is required' });
@@ -287,7 +287,7 @@ app.post('/events/:id/toggleFavorite', async (req, res) => {
 
 
 // Get suggestions for a user, optionally marking favorites for a logged-in user
-app.get('/users/:userId/suggestions', async (req, res) => {
+app.get('/api/users/:userId/suggestions', async (req, res) => {
   const { userId } = req.params;
 
   try {
@@ -561,13 +561,13 @@ app.get('/api/users/:userId/tickets', async (req, res) => {
 
 
 // REVENUE AND KPIS ROUTES
-
-// ** 1. Get Overall Revenue for an Organizer ** //
-app.get('/api/organizers/:organizerId/revenue', async (req, res) => {
+app.get('/api/organizers/:organizerId/kpis', async (req, res) => {
   const { organizerId } = req.params;
 
   try {
-    const eventsSnapshot = await db.collection('events').where('organizer.organizerId', '==', organizerId).get();
+    const eventsSnapshot = await db.collection('events')
+      .where('organizer.organizerId', '==', organizerId)
+      .get();
 
     if (eventsSnapshot.empty) {
       return handleError(res, 404, 'No events found for this organizer.');
@@ -575,73 +575,14 @@ app.get('/api/organizers/:organizerId/revenue', async (req, res) => {
 
     const eventIds = eventsSnapshot.docs.map(doc => doc.id);
 
-    const ticketsSnapshot = await db.collection('tickets').where('eventId', 'in', eventIds).get();
+    const ticketsSnapshot = await db.collection('tickets')
+      .where('eventId', 'in', eventIds)
+      .where('status', '==', 'confirmed')
+      .get();
 
     const totalRevenue = ticketsSnapshot.docs.reduce((sum, doc) => sum + (doc.data().totalPrice || 0), 0);
-
-    handleSuccess(res, { totalRevenue });
-  } catch (e) {
-    handleError(res, 500, 'An error occurred while retrieving overall revenue for the organizer.');
-  }
-});
-
-// ** 2. Get Overall Sold Tickets for an Organizer ** //
-app.get('/api/organizers/:organizerId/sold-tickets', async (req, res) => {
-  const { organizerId } = req.params;
-
-  try {
-    const eventsSnapshot = await db.collection('events').where('organizer.organizerId', '==', organizerId).get();
-
-    if (eventsSnapshot.empty) {
-      return handleError(res, 404, 'No events found for this organizer.');
-    }
-
-    const eventIds = eventsSnapshot.docs.map(doc => doc.id);
-
-    const ticketsSnapshot = await db.collection('tickets').where('eventId', 'in', eventIds).where('status', '==', 'confirmed').get();
-
     const totalSoldTickets = ticketsSnapshot.size;
-
-    handleSuccess(res, { totalSoldTickets });
-  } catch (e) {
-    handleError(res, 500, 'An error occurred while retrieving overall sold tickets for the organizer.');
-  }
-});
-
-
-// ** 3. Get Overall Events for an Organizer ** //
-app.get('/api/organizers/:organizerId/events', async (req, res) => {
-  const { organizerId } = req.params;
-
-  try {
-    const eventsSnapshot = await db.collection('events').where('organizer.organizerId', '==', organizerId).get();
-
     const totalEvents = eventsSnapshot.size;
-
-    handleSuccess(res, { totalEvents });
-  } catch (e) {
-    handleError(res, 500, 'An error occurred while retrieving overall events for the organizer.');
-  }
-});
-
-// ** 4. Get Most Sold Ticket Type for an Organizer ** //
-app.get('/api/organizers/:organizerId/best-ticket-type', async (req, res) => {
-  const { organizerId } = req.params;
-
-  try {
-    const eventsSnapshot = await db.collection('events').where('organizer.organizerId', '==', organizerId).get();
-
-    if (eventsSnapshot.empty) {
-      return handleError(res, 404, 'No events found for this organizer.');
-    }
-
-    const eventIds = eventsSnapshot.docs.map(doc => doc.id);
-
-    const ticketsSnapshot = await db.collection('tickets').where('eventId', 'in', eventIds).where('status', '==', 'confirmed').get();
-
-    if (ticketsSnapshot.empty) {
-      return handleError(res, 404, 'No sold tickets found for this organizer.');
-    }
 
     const ticketTypeCount = ticketsSnapshot.docs.reduce((acc, doc) => {
       const ticketType = doc.data().ticketType;
@@ -653,18 +594,24 @@ app.get('/api/organizers/:organizerId/best-ticket-type', async (req, res) => {
       return acc;
     }, {});
 
-    const bestTicketType = Object.keys(ticketTypeCount).reduce((a, b) => ticketTypeCount[a] > ticketTypeCount[b] ? a : b);
+    const bestTicketType = Object.keys(ticketTypeCount).reduce((a, b) => ticketTypeCount[a] > ticketTypeCount[b] ? a : b, '');
 
-    handleSuccess(res, { bestTicketType, quantity: ticketTypeCount[bestTicketType] });
+    handleSuccess(res, {
+      totalRevenue,
+      totalSoldTickets,
+      totalEvents,
+      bestTicketType,
+      bestTicketTypeQuantity: ticketTypeCount[bestTicketType] || 0
+    });
   } catch (e) {
-    handleError(res, 500, 'An error occurred while retrieving the best ticket type for the organizer.');
+    handleError(res, 500, 'An error occurred while retrieving KPIs for the organizer.');
   }
 });
 
 
 // ATTENDANCE API ENDPOINTS
 // Create a new attendance record
-app.post('/attendance', async (req, res) => {
+app.post('/api/attendance', async (req, res) => {
   const { attendanceId, eventId, userId, timestamp, attendanceStatus, paymentStatus } = req.body;
   try {
     await db.collection('attendances').doc(attendanceId).set({
@@ -682,7 +629,7 @@ app.post('/attendance', async (req, res) => {
 });
 
 // Get a specific attendance record by ID
-app.get('/attendance/:id', async (req, res) => {
+app.get('/api/attendance/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const attendanceDoc = await db.collection('attendances').doc(id).get();
@@ -696,7 +643,7 @@ app.get('/attendance/:id', async (req, res) => {
 });
 
 // Update a specific attendance record by ID
-app.put('/attendance/:id', async (req, res) => {
+app.put('/api/attendance/:id', async (req, res) => {
   const { id } = req.params;
   const { attendanceStatus, paymentStatus } = req.body;
   try {
@@ -711,7 +658,7 @@ app.put('/attendance/:id', async (req, res) => {
 });
 
 // Delete a specific attendance record by ID
-app.delete('/attendance/:id', async (req, res) => {
+app.delete('/api/attendance/:id', async (req, res) => {
   const { id } = req.params;
   try {
     await db.collection('attendances').doc(id).delete();
@@ -723,7 +670,7 @@ app.delete('/attendance/:id', async (req, res) => {
 
 
 // Get attendance list for a given event
-app.get('/attendance/event/:eventId', async (req, res) => {
+app.get('/api/attendance/event/:eventId', async (req, res) => {
   const { eventId } = req.params;
   try {
     const attendanceSnapshot = await db.collection('attendances').where('eventId', '==', eventId).get();
@@ -759,7 +706,7 @@ app.get('/attendance/event/:eventId', async (req, res) => {
 
 // PAYMENT API ENDPOINTS
 // Create a new ticket payment record
-app.post('/payments', async (req, res) => {
+app.post('/api/payments', async (req, res) => {
   const { paymentId, userId, eventId, amount, status, paymentType } = req.body;
   if(!paymentId || !userId || !eventId || !amount || !status || !paymentType) {
     return res.status(400).send({ message: 'Missing required fields' });
@@ -782,7 +729,7 @@ app.post('/payments', async (req, res) => {
 });
 
 // Get a specific payment record by ID
-app.get('/payments/:id', async (req, res) => {
+app.get('/api/payments/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const paymentDoc = await db.collection('payments').doc(id).get();
@@ -796,7 +743,7 @@ app.get('/payments/:id', async (req, res) => {
 });
 
 // Update a specific payment record by ID
-app.put('/payments/:id', async (req, res) => {
+app.put('/api/payments/:id', async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
   try {
@@ -810,7 +757,7 @@ app.put('/payments/:id', async (req, res) => {
 });
 
 // Delete a specific payment record by ID
-app.delete('/payments/:id', async (req, res) => {
+app.delete('/api/payments/:id', async (req, res) => {
   const { id } = req.params;
   try {
     await db.collection('payments').doc(id).delete();
@@ -821,7 +768,7 @@ app.delete('/payments/:id', async (req, res) => {
 });
 
 // Get all payments for a specific user
-app.get('/payments/user/:userId', async (req, res) => {
+app.get('/api/payments/user/:userId', async (req, res) => {
   const { userId } = req.params;
   try {
     const paymentSnapshot = await db.collection('payments').where('userId', '==', userId).get();
@@ -842,7 +789,7 @@ app.get('/payments/user/:userId', async (req, res) => {
 
 
 // Get total revenue for a specific event
-app.get('/revenue/event/:eventId', async (req, res) => {
+app.get('/api/revenue/event/:eventId', async (req, res) => {
   const { eventId } = req.params;
   try {
     const paymentSnapshot = await db.collection('payments').where('eventId', '==', eventId).where('status', '==', 'paid').get();
