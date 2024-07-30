@@ -745,7 +745,7 @@ app.post("/api/payments/batch", async (req, res) => {
     payments.forEach((payment) => {
       const paymentRef = db
         .collection("payments")
-        .doc(payment.payment_id);
+        .doc(payment.paymentId);
       batch.set(paymentRef, payment);
     });
 
