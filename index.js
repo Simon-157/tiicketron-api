@@ -421,7 +421,7 @@ app.get('/api/events/:eventId/statistics', async (req, res) => {
 
     const totalTickets = ticketsSnapshot.size;
     const soldTickets = ticketsSnapshot.docs.filter(doc => doc.data().status === 'confirmed').length;
-    const canceledTickets = ticketsSnapshot.docs.filter(doc => doc.data().status === 'canceled').length;
+    const canceledTickets = ticketsSnapshot.docs.filter(doc => doc.data().status === 'pending').length;
 
     handleSuccess(res, {
       totalTickets,
