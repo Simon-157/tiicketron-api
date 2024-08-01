@@ -605,6 +605,41 @@ app.get('/api/users/:userId/tickets', async (req, res) => {
   }
 });
 
+// verify tickets by qrcode
+app.post('/api/tickets/verify/qrcode', async (req, res) => {
+  const { qrcode } = req.body;
+
+  try {
+    const ticketSnapshot = await db.collection('tickets').where('qrcode', '==', qrcode).get();
+
+    if (ticketSnapshot.empty) {
+      return handleError(res, 404, 'Ticket not found.');
+    }
+
+    const ticket = ticketSnapshot.docs[0].data();
+    handleSuccess(res, ticket);
+  } catch (e) {
+    handleError(res, 500, 'An error occurred while verifying the ticket.');
+  }
+});
+
+// verify tickets by barcode
+app.post('/api/tickets/verify/barcode', async (req, res) => {
+  const { barcode } = req.body;
+
+  try {
+    const ticketSnapshot = await db.collection('tickets').where('barcode', '==', barcode).get();
+
+    if (ticketSnapshot.empty) {
+      return handleError(res, 404, 'Ticket not found.');
+    }
+
+    const ticket = ticketSnapshot.docs[0].data();
+    handleSuccess(res, ticket);
+  } catch (e) {
+    handleError(res, 500, 'An error occurred while verifying the ticket.');
+  }
+});
 
 
 // REVENUE AND KPIS ROUTES
