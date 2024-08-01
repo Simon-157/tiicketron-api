@@ -641,6 +641,23 @@ app.post('/api/tickets/verify/barcode', async (req, res) => {
   }
 });
 
+// update  attendance by userid and eventid
+app.put('/api/attendances/:userId/:eventId', async (req, res) => {
+  // const { userId, eventId } = req.params;
+  const { attendanceStatus, paymentStatus, userId, eventId } = req.body;
+  try {
+    const attendanceSnapshot = await db.collection('attendances').where('userId', '==', userId).where('eventId', '==', eventId).get();
+    if (attendanceSnapshot.empty) {
+      return handleError(res, 404, 'Attendance not found.');
+    }
+    const attendanceId = attendanceSnapshot.docs[0].id;
+    await db.collection('attendances').doc(attendanceId).update({ attendanceStatus, paymentStatus });
+    handleSuccess(res, { message: 'Attendance updated successfully.' });
+  } catch (error) {
+    handleError(res, 500, 'An error occurred while updating the attendance.');
+  }
+});
+
 
 // REVENUE AND KPIS ROUTES
 app.get('/api/organizers/:organizerId/kpis', async (req, res) => {
